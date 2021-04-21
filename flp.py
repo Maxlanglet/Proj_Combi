@@ -30,25 +30,13 @@ def read_instance(file_name):
 
 
 def obj_function(model):
-    print(model.f[0])
-    print(np.asarray(model.t))
-    print(len(model.t))
-    print(np.asarray(model.I))
-    print(np.asarray(model.J), "\n\n")
-    fT = 1
-    tT = transpose(model.t, np.asarray(model.I), np.asarray(model.J))
-    x = 1
-    y = 1
-    #return fT*y+tT*x
+    return sum(model.f[j]*model.y[j] for j in model.J)+sum(model.t[(i,j)]*model.x[(i,j)] for i in model.I for j in model.J)
 
-def transpose(param, x, y):
-    for i in x:
-        for j in y:
-            temp=param[(i,j)]
-            param[(i,j)]=param[(j,i)]
-            param[(i,j)]=temp
-            print(temp, param[(i,j)])
-    return param
+def first_constraint_rule(model, j):
+    return sum(model.x[(i,j)] for i in model.I) <= model.c[j]*model.y[j]
+
+def sec_constraint_rule(model, i):
+    return sum(model.x[(i,j)] for j in model.J) >= model.d[i]
 
 
 
@@ -61,35 +49,27 @@ def solve_flp(instance_name,linear):
     model.J = pyo.RangeSet(0,len(capacity)-1)
 
 
-    model.f = pyo.Param(model.J,initialize=opening_cost,default=0, mutable=True)#f
-    model.c = pyo.Param(model.J,initialize=capacity,default=0, mutable=True)#u??
-    model.d = pyo.Param(model.I,initialize=demand,default=0, mutable=True)#d
-    model.t = pyo.Param(model.I,model.J,initialize=travel_cost,default=0, mutable=True)#t
+    model.f = pyo.Param(model.J,initialize=opening_cost,default=0)#f
+    model.c = pyo.Param(model.J,initialize=capacity,default=0)#u??
+    model.d = pyo.Param(model.I,initialize=demand,default=0)#d
+    model.t = pyo.Param(model.I,model.J,initialize=travel_cost,default=0)#t
 
     #instance = model.create_instance('abs_data.dat')
     #instance.pprint()
 
-    model.x = pyo.Var(model.I, model.J, domain=pyo.PositiveIntegers)
+    model.x = pyo.Var(model.I, model.J, domain=pyo.NonNegativeIntegers)#A discuter
     model.y = pyo.Var(model.J, domain=pyo.Binary)
 
     #Add objectives and constraints
 
-    obj_function(model)#<------------------ Stopped here
+    model.obj = pyo.Objective(rule=obj_function)
 
-    #model.obj = pyo.Objective(rule=obj_expression)
-
-    def ax_constraint_rule(model, j):
-        return sum(model.x[i,j] for i in model.I) <= model.c[j]*model.y[j]
-
-    def sec_constraint_rule(model, i):
-        return sum(model.x[i,j] for j in model.J) >= model.d[i]
-
-    model.con_1 = pyo.Constraint(model.J,rule=ax_constraint_rule)
+    model.con_1 = pyo.Constraint(model.J,rule=first_constraint_rule)
     model.con_2 = pyo.Constraint(model.I,rule=sec_constraint_rule)
 
-    # opt = pyo.SolverFactory("glpk")
-    # opt.solve(model,tee=linear)
-    # print(pyo.value(model.obj))
+    opt = pyo.SolverFactory("glpk")
+    opt.solve(model,tee=False)
+    print(pyo.value(model.obj))
 
     #return (obj,x,y)
     
