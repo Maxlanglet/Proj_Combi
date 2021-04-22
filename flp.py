@@ -146,7 +146,7 @@ def initial_solution_flp(instance_name):
             if sum(x_bar[:,j])<c[j] and sum(x_bar[i,:])<d[i]:
                 x_bar[i,j] = min(c[j]-sum(x_bar[:,j]), d[i]-sum(x_bar[i,:]))
 
-        
+
         if satisfying_cond(x_bar, d):
             obj = sec_function(x_bar,y_bar,t,f)
             print(obj)
@@ -173,4 +173,5 @@ if __name__ == '__main__':
     #solve_flp("FLP-100-20-0.txt", False)
     #initial_solution_flp("FLP-100-20-0.txt")
     initial_solution_flp("FLP-200-40-0.txt")
+    print("coucou la famille")
     #solve_flp("FLP-100-20-0.txt", False)
