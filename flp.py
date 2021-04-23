@@ -1,5 +1,7 @@
 import pyomo.environ as pyo
 import numpy as np
+import random
+import time
 
 def read_instance(file_name):
     opening_cost = {}
@@ -44,6 +46,8 @@ def sec_function(x,y,t,f):
     return sum(f[j]*y[j] for j in range(len(y)))+sum(t[(i,j)]*x[(i,j)] for i in range(len(x)) for j in range(len(x[0])))
 
 
+
+#TODO: CHANGE FOR LOOPS
 def solve_flp(instance_name,linear):
     opening_cost, demand, capacity, travel_cost = read_instance(instance_name)
 
@@ -79,6 +83,8 @@ def solve_flp(instance_name,linear):
 
     x = np.zeros(shape=(np.asarray(model.I)[-1]+1,np.asarray(model.J)[-1]+1))
     y = np.zeros(shape=(np.asarray(model.J)[-1]+1))
+
+
     for i in np.asarray(model.I):
         for j in np.asarray(model.J):
             x[i,j]=model.x[i,j].value
@@ -105,7 +111,7 @@ def solve_flp(instance_name,linear):
         for l in np.asarray(model.J):
             t[k,l]=model.t[k,l]
 
-    print(obj)
+    #print(obj)
 
 
     return (obj,x,y,model,c,d,t,f)
@@ -149,8 +155,8 @@ def initial_solution_flp(instance_name):
 
         if satisfying_cond(x_bar, d):
             obj = sec_function(x_bar,y_bar,t,f)
-            print(obj)
-            return(obj,x_bar,y_bar)
+            #print(obj)
+            return(obj,x_bar,y_bar,c,d,t,f)
     #return (obj,x,y)
 
 def satisfying_cond(x_bar, d):
@@ -164,14 +170,83 @@ def satisfying_cond(x_bar, d):
     else:
         return True
 
-def local_search_flp(x,y):
-    pass
+def local_search_flp(instance_name):
+
+    t_end = 30*60#stopping criterion
+    t_1 = time.time()
+    obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
+
+
+    y_bar, x_bar = y, x
+    j1_p, j2_p, j1_m, j2_m = random_assignement(x_bar,c)
+
+    y_bar[j1_p], y_bar[j2_p] = 0, 0
+
+    x[:,j1_m] = [0 for i in range(x_bar.shape[0])]
+    x[:,j2_m] = [0 for i in range(x_bar.shape[0])]
+
+
+    sort_d = np.zeros(shape=(d.shape[0], 2)).astype('uint16')
+
+    for i in range(len(d)):
+        sort_d[i,0] = d[i]
+        sort_d[i,1] = i
+    sort_d = sort_d[np.argsort(sort_d[:, 0])[::-1]]
+
+    temp = np.zeros(shape=(t.shape[1], 2)).astype('uint16')
+
+    for i_p in range(x_bar.shape[0]):
+
+        i=sort_d[i_p,1]
+
+        temp[:,0] = t[i,:]
+        temp[:,1] = [j for j in range(t.shape[1])]
+
+        temp = temp[np.argsort(temp[:, 0])]
+        
+        for j_p in range(x_bar.shape[1]):
+
+            j = temp[j_p,1]
+
+            if y_bar[j] ==1 and sum(x_bar[:,j])<c[j] and sum(x_bar[i,:])<d[i]:
+                x_bar[i,j] = min(c[j]-sum(x_bar[:,j]), d[i]-sum(x_bar[i,:]))
+
+            t_2 = time.time()
+            if t_end<t_2-t_1:
+                obj = sec_function(x_bar,y_bar,t,f)
+                print(obj)
+                return(obj, x_bar,y_bar)
+
+    #print(t_end, t_2-t_1)
+
+    obj = sec_function(x_bar,y_bar,t,f)
+    print(obj)
+    return(obj, x_bar,y_bar)
     #return (obj,x,y)
+
+def random_assignement(x_bar, c):
+    i=0
+    random.seed(i)
+    j1_p = random.randrange(x_bar.shape[1])
+    j2_p = random.randrange(x_bar.shape[1])
+    j1_m = random.randrange(x_bar.shape[1])
+    j2_m = random.randrange(x_bar.shape[1])
+
+    while sum(x_bar[:,j1_m]+x_bar[:,j2_m])<=c[j1_p]+c[j2_p] and i<10000:
+        random.seed(i)
+        j1_p = random.randrange(x_bar.shape[1])
+        j2_p = random.randrange(x_bar.shape[1])
+        j1_m = random.randrange(x_bar.shape[1])
+        j2_m = random.randrange(x_bar.shape[1])
+        i+=1
+
+
+    return j1_m,j1_p,j2_m,j2_p
 
 
 if __name__ == '__main__':
     #solve_flp("FLP-100-20-0.txt", False)
     #initial_solution_flp("FLP-100-20-0.txt")
-    initial_solution_flp("FLP-200-40-0.txt")
-    print("coucou la famille")
+    #initial_solution_flp("FLP-200-40-0.txt")
+    local_search_flp("FLP-250-100-0.txt")
     #solve_flp("FLP-100-20-0.txt", False)
