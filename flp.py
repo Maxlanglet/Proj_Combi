@@ -73,22 +73,28 @@ def convertToNpArray(model): #x,y,obj,c,d,t,f,
             t[k,l]=model.t[k,l]
     return x,y,obj,c,d,t,f
 
-def facility_movement(y_bar, x_bar,c, seed):
-    j1_p, j2_p, j1_m, j2_m = random_assignement(x_bar,c, seed)
+def facility_movement(y, x,c, seed):
+    y_bar = copy.deepcopy(y)
+    x_bar = copy.deepcopy(x)
 
-    #--- CORRECTION: BEGIN ---#
-    #y_bar[j1_p], y_bar[j2_p] = 0, 0 #ERROR? should be 1, 1
-    #missing y_bar[j1_m] and y_bar[j2_m] = 0, 0
+    j1_p,j2_p, j1_m, j2_m = random_facility(x_bar, y_bar,c, seed)
+
     y_bar[j1_p], y_bar[j2_p] = 1, 1
     y_bar[j1_m], y_bar[j2_m] = 0, 0
 
-    #x[:,j1_m] = [0 for i in range(x_bar.shape[0])] #ERROR, should be x_bar
-    #x[:,j2_m] = [0 for i in range(x_bar.shape[0])] #ERROR, should be x_bar
-    x_bar[:,j1_m] = 0 #no need for the for, the ":" takes care of all the i elements
-    x_bar[:,j2_m] = 0 #no need for the for, the ":" takes care of all the i elements
+    x_bar[:,j1_m] = 0
+    x_bar[:,j2_m] = 0
 
-    #--- CORRECTION: END ---#
     return y_bar, x_bar
+
+def assignment_movement(y,x,c,seed):
+    y_bar = copy.deepcopy(y)
+    x_bar = copy.deepcopy(x)
+    j = random_assignment(x_bar, seed)
+    print(j)
+    return y_bar, x_bar
+
+
 
 #TODO: CHANGE FOR LOOPS
 def solve_flp(instance_name,linear):
@@ -98,7 +104,6 @@ def solve_flp(instance_name,linear):
     model = pyo.ConcreteModel()
     model.I = pyo.RangeSet(0,len(demand)-1)
     model.J = pyo.RangeSet(0,len(capacity)-1)
-
 
     model.f = pyo.Param(model.J,initialize=opening_cost,default=0)#f
     model.c = pyo.Param(model.J,initialize=capacity,default=0)#u??
@@ -125,7 +130,7 @@ def solve_flp(instance_name,linear):
     #print(pyo.value(model.obj))
 
     x,y,obj,c,d,t,f = convertToNpArray(model)
-    #print(obj)
+    print(obj)
     return (obj,x,y,model,c,d,t,f)
 
 def initial_solution_flp(instance_name):
@@ -151,7 +156,7 @@ def initial_solution_flp(instance_name):
     for j_p in range(len(sort_y)):#len(sort_y)
 
         j=int(sort_y[j_p,1])
-
+        y_bar[j] = 1
         temp[:,0] = x[:,j]
         temp[:,1] = [i for i in range(len(x))]
 
@@ -194,7 +199,9 @@ def sort_function(vector, order):
 
     return sort_v
 #y_bar, x_bar = greedy_reassign(y_bar, x_bar, sort_d, t, c, d)
-def greedy_reassign(y_bar, x_bar, sort_d, t, c, d):
+def greedy_reassign(y, x, sort_d, t, c, d):
+    y_bar = copy.deepcopy(y)
+    x_bar = copy.deepcopy(x)
     temp = np.zeros(shape=(t.shape[1], 2)).astype('uint16')
 
     for i_p in range(x_bar.shape[0]):
@@ -220,43 +227,71 @@ def local_search_flp(instance_name):
     #Sorting d in decreasing order
     sort_d = sort_function(d, "decreasing")
     #Initialization
-    y_bar, x_bar = np.copy(y), np.copy(x)
+    y_bar, x_bar = copy.deepcopy(y), copy.deepcopy(x)
+    print("BEGIN")
 
-    continue_search = True
+    # --------
+    y_best, x_best = copy.deepcopy(y_bar), copy.deepcopy(x_bar)
+    obj_best = copy.deepcopy(obj)
+
+    counter_no_improvement=0
+    count_local_moves=0
     seed_original = 0
-    while(continue_search):
-        #Perturbation
+    move_facility=False
+    move_assignement=True
+    continue_search=True
+
+
+    while(continue_search and count_local_moves<3):
         random.seed(seed_original)
         seed= random.randrange(100000)
-        y_new, x_new = facility_movement(y_bar, x_bar, c, seed)
+
+        #Perturbation (local move)
+        if counter_no_improvement>100:
+            count_local_moves+=1
+            move_facility = not move_facility
+            move_assignement = not move_assignement
+
+        if move_facility==True:
+            y_new, x_new = facility_movement(y_bar, x_bar, c, seed)
+        if move_assignement==True:
+            y_new, x_new = assignment_movement(y_bar, x_bar, c, seed)
+
         y_new, x_new = greedy_reassign(y_new, x_new, sort_d, t, c, d)
         obj_new = sec_function(x_new,y_new,t,f)
-        if (obj_new<obj):
-            obj=copy.deepcopy(obj_new)
-            y_bar, x_bar = copy.deepcopy(y_new),copy.deepcopy(x_new)
+        if (obj_new<obj_best):
+            #obj_best=copy.deepcopy(obj_new)
+            count_local_moves=0
+            counter_no_improvement=0
+            y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
+            obj_best= sec_function(x_best,y_best,t,f)
+            print(obj_best)
+        else:
+            counter_no_improvement+=1
+
+        #Stop criterion
         t_2 = time.time()
-        print("-------------->", obj, obj_new)
-        #also add constraint: max number of iteration without improvement
         if t_end<t_2-t_1:
             continue_search=False
         seed_original+=1
 
-    #print(t_end, t_2-t_1)
-    obj = sec_function(x_bar,y_bar,t,f) #redundant but let's keep it for the readibility
-    print("-->", y_bar, y_new)
-    print(obj)
+
+    print("-->", y_bar.all()==y_new.all())
+    print(sec_function(x_best,y_best,t,f))
+    print(obj_best)
+    #print(obj)
     return(obj, x_bar,y_bar)
     #return (obj,x,y)
 
-def random_assignement(x_bar, c, seed):
+def random_facility(x_bar,y_bar, c, seed):
     i=seed
     random.seed(i)
     j1_p = random.randrange(x_bar.shape[1])
     j2_p = random.randrange(x_bar.shape[1])
     j1_m = random.randrange(x_bar.shape[1])
     j2_m = random.randrange(x_bar.shape[1])
-
-    while sum(x_bar[:,j1_m]+x_bar[:,j2_m])>c[j1_p]+c[j2_p] and i<10000:
+    #although not explicit, it will randomly choose between 0 and 2 facilities to open or and to close
+    while sum(x_bar[:,j1_m]+x_bar[:,j2_m])>c[j1_p]+c[j2_p]: # and y_bar[j1_p]==0 and y_bar[j2_p]==0 and y_bar[j1_m]==1 and y_bar[j2_m]==1
         i+=1
         random.seed(i)
         j1_p = random.randrange(x_bar.shape[1])
@@ -264,8 +299,42 @@ def random_assignement(x_bar, c, seed):
         j1_m = random.randrange(x_bar.shape[1])
         j2_m = random.randrange(x_bar.shape[1])
 
+    return j1_p, j2_p, j1_m, j2_m
 
-    return j1_m,j1_p,j2_m,j2_p
+def random_assignment(x_bar, seed):
+    s=seed
+    random.seed(s)
+    nb_customers = random.randrange(1,3)
+    condition=0
+    nb_facilities = 2
+    j = np.zeros(shape=(nb_customers,3)).astype('uint8')
+
+    #valid_i = f(non_zeros_indexes, nb_customers)
+    valid_i = np.count_nonzero(x_bar>0, axis = 0)
+    print("##############")
+    print(valid_i)
+    valid_i = [valid_i!=0]#np.getindexes(valid_i>=2)
+    print("##############")
+    print(valid_i)
+    #valid_j = f(non_zeros_indexes, valid_i)
+
+    while(condition==0):
+        for k in range(nb_customers):
+            j[k,0] = random.randrange(x_bar.shape[0]) #customer i
+            j[k,1] = random.randrange(x_bar.shape[1])
+            j[k,2] = random.randrange(x_bar.shape[1])
+            while(j[k,2]==j[k,1]):
+                j[k,2] = random.randrange(x_bar.shape[1])
+        while(nb_customers==2 and j[0,0]==j[1,0]):
+            j[1,0]=random.randrange(x_bar.shape[0])
+        condition=1
+        for l in range(nb_customers):
+            condition*= x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]]
+        #temp1=[x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]] for l in range(nb_customers)]
+        #condition=[temp*=x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]] for l in range(nb_customers)]
+
+        s+=1
+    return j
 
 
 if __name__ == '__main__':
