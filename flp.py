@@ -88,12 +88,33 @@ def facility_movement(y, x,c, seed):
     return y_bar, x_bar
 
 def assignment_movement(y,x,c,seed):
+    random.seed(seed)
     y_bar = copy.deepcopy(y)
     x_bar = copy.deepcopy(x)
-    j = random_assignment(x_bar, seed)
-    #print(j)
-
+    j = random_assignment(x_bar, seed) #j contains i1 (and may be i2) and 2 facilities associated to him
+    # A close look inside the vector j = [[i1,j11,j12], [i2,j21,j22]]
+    #print("---> Look at j: ",j)
     #TODO : Reassign randomly each demand to up to 2 facilities each.
+    for k in range (j.shape[0]):
+
+        sum_xij_for_2_facilities=0
+        sum_xij_for_2_facilities = x_bar[j[k,0],j[k,1]] + x_bar[j[k,0],j[k,2]]
+        # print("y.shape[0] : ", j.shape[0])
+        # print("x_bar[j[k,0],j[k,1]] : ",x_bar[j[k,0],j[k,1]] )
+        # print("x_bar[j[k,0],j[k,2]]", x_bar[j[k,0],j[k,2]])
+        # print("sum_xij_for_2_facilities :", sum_xij_for_2_facilities)
+        first_new_xij = random.randrange(0, sum_xij_for_2_facilities)
+        second_new_xij= sum_xij_for_2_facilities - first_new_xij
+        x_bar[j[k,0],j[k,1]] = first_new_xij
+        x_bar[j[k,0],j[k,2]] = second_new_xij
+        # print("first_new_xij: ", first_new_xij)
+        # print("second_new_xij : ", second_new_xij)
+        # print("x_bar[j[k,0],j[k,1]] : ", x_bar[j[k,0],j[k,1]])
+        # print("x_bar[j[k,0],j[k,2]] : ", x_bar[j[k,0],j[k,2]])
+        # print("coucou")
+
+
+    #rand_reass =
     return y_bar, x_bar
 
 
@@ -213,7 +234,7 @@ def greedy_reassign(y, x, sort_d, t, c, d):
 
 def local_search_flp(instance_name):
 
-    t_end = 0.5*60#stopping criterion
+    t_end = 10*60#stopping criterion
     t_1 = time.time()
     obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
 
@@ -227,13 +248,14 @@ def local_search_flp(instance_name):
     obj_best = copy.deepcopy(obj)
 
     counter_no_improvement=0
-    max_no_improvement = 1000
+    max_no_improvement = 500
     count_local_moves=0
     seed_original = 0
-    move_facility=True
-    move_assignment=False
+    move_facility=False
+    move_assignment=True
     continue_search=True
-
+    print("move_facility: ", move_facility)
+    print("move_assignment: ", move_assignment)
 
     while(continue_search and count_local_moves<3):
         random.seed(seed_original)
@@ -241,9 +263,14 @@ def local_search_flp(instance_name):
 
         #Perturbation (local move)
         if counter_no_improvement>max_no_improvement:
+            counter_no_improvement=0
             count_local_moves+=1
             move_facility = not move_facility
             move_assignment = not move_assignment
+            print("move_facility: ", move_facility)
+            print("move_assignment: ", move_assignment)
+            if count_local_moves==3:
+                print("No more improvement with both movements, the search stops")
 
         if move_facility==True:
             y_new, x_new = facility_movement(y_bar, x_bar, c, seed)
