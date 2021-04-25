@@ -184,6 +184,7 @@ def initial_solution_flp(instance_name):
 
         if satisfying_cond(x_bar, d):
             obj = sec_function(x_bar,y_bar,t,f)
+            print(obj)
 
             return(obj,x_bar,y_bar,c,d,t,f)
     #return (obj,x,y)
@@ -248,8 +249,12 @@ def local_search_flp(instance_name):
     obj_best = copy.deepcopy(obj)
 
     counter_no_improvement=0
-    max_no_improvement = 500
+    max_no_improvement = 10
     count_local_moves=0
+    max_local_moves_no_improvement = 300
+    #since the seed changes at each iteration of the while
+    #it makes sense to suppose a better move even
+    #after 3 different local moves without improvement"
     seed_original = 0
     move_facility=False
     move_assignment=True
@@ -257,7 +262,7 @@ def local_search_flp(instance_name):
     print("move_facility: ", move_facility)
     print("move_assignment: ", move_assignment)
 
-    while(continue_search and count_local_moves<3):
+    while(continue_search and count_local_moves<max_local_moves_no_improvement):
         random.seed(seed_original)
         seed= random.randrange(100000)
 
@@ -269,7 +274,7 @@ def local_search_flp(instance_name):
             move_assignment = not move_assignment
             print("move_facility: ", move_facility)
             print("move_assignment: ", move_assignment)
-            if count_local_moves==3:
+            if count_local_moves==max_local_moves_no_improvement:
                 print("No more improvement with both movements, the search stops")
 
         if move_facility==True:
@@ -347,8 +352,11 @@ def random_assignment(x_bar, seed):
 
 
 if __name__ == '__main__':
-    #solve_flp("FLP-100-20-0.txt", False)
+    instance = "FLP-150-30-0.txt"
+    print("best solution:")
+    solve_flp(instance, False)
     #initial_solution_flp("FLP-100-20-0.txt")
     #initial_solution_flp("FLP-200-40-0.txt")
-    local_search_flp("FLP-100-20-0.txt")
+    print("Local search : ")
+    local_search_flp(instance)
     #solve_flp("FLP-100-20-0.txt", False)
