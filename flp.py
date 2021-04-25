@@ -91,7 +91,9 @@ def assignment_movement(y,x,c,seed):
     y_bar = copy.deepcopy(y)
     x_bar = copy.deepcopy(x)
     j = random_assignment(x_bar, seed)
-    print(j)
+    #print(j)
+
+    #TODO : Reassign randomly each demand to up to 2 facilities each.
     return y_bar, x_bar
 
 
@@ -137,29 +139,21 @@ def initial_solution_flp(instance_name):
     #GREEDY ALGORITHM
     obj, x, y, model,c,d,t,f = solve_flp(instance_name, True)
 #----------------Algo commence
-
     sort_y = np.zeros(shape=(y.shape[0], 2))
-
     for j in range(len(y)):
         sort_y[j,0] = y[j]
         sort_y[j,1] = j
-
     sort_y = sort_y[np.argsort(sort_y[:, 0])[::-1]]
 
     x_bar = np.zeros(shape=x.shape)
     y_bar = np.zeros(shape=y.shape)
 
-
     temp = np.zeros(shape=(x.shape[0], 2))
-
-
-    for j_p in range(len(sort_y)):#len(sort_y)
-
+    for j_p in range(len(sort_y)):
         j=int(sort_y[j_p,1])
         y_bar[j] = 1
         temp[:,0] = x[:,j]
         temp[:,1] = [i for i in range(len(x))]
-
         temp = temp[np.argsort(temp[:, 0])[::-1]]
         for i_p in range(len(temp)):
             i=int(temp[i_p,1])
@@ -167,10 +161,9 @@ def initial_solution_flp(instance_name):
             if sum(x_bar[:,j])<c[j] and sum(x_bar[i,:])<d[i]:
                 x_bar[i,j] = min(c[j]-sum(x_bar[:,j]), d[i]-sum(x_bar[i,:]))
 
-
         if satisfying_cond(x_bar, d):
             obj = sec_function(x_bar,y_bar,t,f)
-            #print(obj)
+
             return(obj,x_bar,y_bar,c,d,t,f)
     #return (obj,x,y)
 
@@ -198,7 +191,7 @@ def sort_function(vector, order):
         print("Please choose either 'decreasing' or 'increasing' for the parameter 'order' ")
 
     return sort_v
-#y_bar, x_bar = greedy_reassign(y_bar, x_bar, sort_d, t, c, d)
+
 def greedy_reassign(y, x, sort_d, t, c, d):
     y_bar = copy.deepcopy(y)
     x_bar = copy.deepcopy(x)
@@ -220,7 +213,7 @@ def greedy_reassign(y, x, sort_d, t, c, d):
 
 def local_search_flp(instance_name):
 
-    t_end = 0.1*60#stopping criterion
+    t_end = 0.5*60#stopping criterion
     t_1 = time.time()
     obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
 
@@ -228,17 +221,17 @@ def local_search_flp(instance_name):
     sort_d = sort_function(d, "decreasing")
     #Initialization
     y_bar, x_bar = copy.deepcopy(y), copy.deepcopy(x)
-    print("BEGIN")
+    print("########## BEGIN ##########")
 
-    # --------
     y_best, x_best = copy.deepcopy(y_bar), copy.deepcopy(x_bar)
     obj_best = copy.deepcopy(obj)
 
     counter_no_improvement=0
+    max_no_improvement = 1000
     count_local_moves=0
     seed_original = 0
-    move_facility=False
-    move_assignement=True
+    move_facility=True
+    move_assignment=False
     continue_search=True
 
 
@@ -247,20 +240,19 @@ def local_search_flp(instance_name):
         seed= random.randrange(100000)
 
         #Perturbation (local move)
-        if counter_no_improvement>100:
+        if counter_no_improvement>max_no_improvement:
             count_local_moves+=1
             move_facility = not move_facility
-            move_assignement = not move_assignement
+            move_assignment = not move_assignment
 
         if move_facility==True:
             y_new, x_new = facility_movement(y_bar, x_bar, c, seed)
-        if move_assignement==True:
+        if move_assignment==True:
             y_new, x_new = assignment_movement(y_bar, x_bar, c, seed)
 
         y_new, x_new = greedy_reassign(y_new, x_new, sort_d, t, c, d)
         obj_new = sec_function(x_new,y_new,t,f)
         if (obj_new<obj_best):
-            #obj_best=copy.deepcopy(obj_new)
             count_local_moves=0
             counter_no_improvement=0
             y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
@@ -275,10 +267,9 @@ def local_search_flp(instance_name):
             continue_search=False
         seed_original+=1
 
-
-    print("-->", y_bar.all()==y_new.all())
     print(sec_function(x_best,y_best,t,f))
     print(obj_best)
+    print(y_best)
     #print(obj)
     return(obj, x_bar,y_bar)
     #return (obj,x,y)
@@ -303,37 +294,28 @@ def random_facility(x_bar,y_bar, c, seed):
 
 def random_assignment(x_bar, seed):
     s=seed
+    np.random.seed(s)
     random.seed(s)
     nb_customers = random.randrange(1,3)
-    condition=0
+    #condition=0
     nb_facilities = 2
+    valid_i = np.count_nonzero(x_bar>0, axis = 1)
+    valid_i = np.flatnonzero(valid_i>=2)
     j = np.zeros(shape=(nb_customers,3)).astype('uint8')
+    j[:,0] = np.random.choice(valid_i, nb_customers, replace=False)
+    line = 0
+    for p in j[:,0]:
+        valid_j = np.flatnonzero(x_bar[p,:])
+        #j_list = np.random.choice(valid_j, 4, replace=False)
+        j[line,1:] = np.random.choice(valid_j, 2, replace=False)
+        line+=1
+    #not useful to test the condition anymore because we looked into i,j values
+    #that respected this condition
 
-    #valid_i = f(non_zeros_indexes, nb_customers)
-    valid_i = np.count_nonzero(x_bar>0, axis = 0)
-    print("##############")
-    print(valid_i)
-    valid_i = [valid_i!=0]#np.getindexes(valid_i>=2)
-    print("##############")
-    print(valid_i)
-    #valid_j = f(non_zeros_indexes, valid_i)
+    # condition=1
+    # for i in range(nb_customers):
+    #     condition*= x_bar[j[i,0],j[i,1]]*x_bar[j[i,0],j[i,2]]
 
-    while(condition==0):
-        for k in range(nb_customers):
-            j[k,0] = random.randrange(x_bar.shape[0]) #customer i
-            j[k,1] = random.randrange(x_bar.shape[1])
-            j[k,2] = random.randrange(x_bar.shape[1])
-            while(j[k,2]==j[k,1]):
-                j[k,2] = random.randrange(x_bar.shape[1])
-        while(nb_customers==2 and j[0,0]==j[1,0]):
-            j[1,0]=random.randrange(x_bar.shape[0])
-        condition=1
-        for l in range(nb_customers):
-            condition*= x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]]
-        #temp1=[x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]] for l in range(nb_customers)]
-        #condition=[temp*=x_bar[j[l,0],j[l,1]]*x_bar[j[l,0],j[l,2]] for l in range(nb_customers)]
-
-        s+=1
     return j
 
 
