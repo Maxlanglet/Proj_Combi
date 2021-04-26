@@ -3,6 +3,7 @@ import numpy as np
 import random
 import time
 import copy
+import sys
 
 def read_instance(file_name):
     opening_cost = {}
@@ -92,6 +93,9 @@ def assignment_movement(y,x,c,seed):
     y_bar = copy.deepcopy(y)
     x_bar = copy.deepcopy(x)
     j = random_assignment(x_bar, seed) #j contains i1 (and may be i2) and 2 facilities associated to him
+
+    if j == []:
+        return y_bar, x_bar
     # A close look inside the vector j = [[i1,j11,j12], [i2,j21,j22]]
     #print("---> Look at j: ",j)
     #TODO : Reassign randomly each demand to up to 2 facilities each.
@@ -235,7 +239,7 @@ def greedy_reassign(y, x, sort_d, t, c, d):
 
 def local_search_flp(instance_name):
 
-    t_end = 10*60#stopping criterion
+    t_end = 20*60#stopping criterion
     t_1 = time.time()
     obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
 
@@ -243,7 +247,7 @@ def local_search_flp(instance_name):
     sort_d = sort_function(d, "decreasing")
     #Initialization
     y_bar, x_bar = copy.deepcopy(y), copy.deepcopy(x)
-    print("########## BEGIN ##########")
+    print("########## BEGIN LOCAL SEARCH ##########")
 
     y_best, x_best = copy.deepcopy(y_bar), copy.deepcopy(x_bar)
     obj_best = copy.deepcopy(obj)
@@ -259,8 +263,8 @@ def local_search_flp(instance_name):
     move_facility=False
     move_assignment=True
     continue_search=True
-    print("move_facility: ", move_facility)
-    print("move_assignment: ", move_assignment)
+    # print("move_facility: ", move_facility)
+    # print("move_assignment: ", move_assignment)
 
     while(continue_search and count_local_moves<max_local_moves_no_improvement):
         random.seed(seed_original)
@@ -272,24 +276,35 @@ def local_search_flp(instance_name):
             count_local_moves+=1
             move_facility = not move_facility
             move_assignment = not move_assignment
-            print("move_facility: ", move_facility)
-            print("move_assignment: ", move_assignment)
+            # print("move_facility: ", move_facility)
+            # print("move_assignment: ", move_assignment)
             if count_local_moves==max_local_moves_no_improvement:
                 print("No more improvement with both movements, the search stops")
 
         if move_facility==True:
-            y_new, x_new = facility_movement(y_bar, x_bar, c, seed)
-        if move_assignment==True:
-            y_new, x_new = assignment_movement(y_bar, x_bar, c, seed)
+            y_new, x_new = facility_movement(y_best, x_best, c, seed)
+            if np.sum(y_new) < np.sum(y_bar)-x_bar.shape[1]//10:
+                y_new, x_new = y_best, x_best
+                #y_new, x_new = y_bar, x_bar
+                move_facility = not move_facility
+                move_assignment = not move_assignment
 
+        if move_assignment==True:
+            y_new, x_new = assignment_movement(y_best, x_best, c, seed)
+            if y_new.all() == y_best.all() and x_new.all() == x_best.all():
+                move_facility = not move_facility
+                move_assignment = not move_assignment
+
+        
         y_new, x_new = greedy_reassign(y_new, x_new, sort_d, t, c, d)
         obj_new = sec_function(x_new,y_new,t,f)
         if (obj_new<obj_best):
             count_local_moves=0
             counter_no_improvement=0
-            y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
-            obj_best= sec_function(x_best,y_best,t,f)
-            print(obj_best)
+            if respect_constraints(x_new, y_new, c, d):
+                y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
+                obj_best= sec_function(x_best,y_best,t,f)
+                print(obj_best)
         else:
             counter_no_improvement+=1
 
@@ -303,8 +318,18 @@ def local_search_flp(instance_name):
     print(obj_best)
     print(y_best)
     #print(obj)
-    return(obj, x_bar,y_bar)
+    return(obj, x_best,y_best)
     #return (obj,x,y)
+
+def respect_constraints(x,y,c,d):
+    const1 = [sum(x[i,:])>=d[i] for i in range(x.shape[0])]
+    const2 = [sum(x[:,j])<=c[j]*y[j] for j in range(x.shape[1])]
+
+    if np.all(const1) and np.all(const2):
+        return True
+    else:
+        return False
+
 
 def random_facility(x_bar,y_bar, c, seed):
     i=seed
@@ -333,8 +358,14 @@ def random_assignment(x_bar, seed):
     nb_facilities = 2
     valid_i = np.count_nonzero(x_bar>0, axis = 1)
     valid_i = np.flatnonzero(valid_i>=2)
-    j = np.zeros(shape=(nb_customers,3)).astype('uint8')
-    j[:,0] = np.random.choice(valid_i, nb_customers, replace=False)
+    if len(valid_i) >1:
+        j = np.zeros(shape=(nb_customers,3)).astype('uint8')
+        j[:,0] = np.random.choice(valid_i, nb_customers, replace=False)
+    elif len(valid_i) == 1:
+        j = np.zeros(shape=(1,3)).astype('uint8')
+        j[:,0] = np.random.choice(valid_i, 1, replace=False)
+    else:
+        return []
     line = 0
     for p in j[:,0]:
         valid_j = np.flatnonzero(x_bar[p,:])
@@ -352,11 +383,11 @@ def random_assignment(x_bar, seed):
 
 
 if __name__ == '__main__':
-    instance = "FLP-150-30-0.txt"
-    print("best solution:")
+    #instance = "FLP-150-30-0.txt"
+    instance = sys.argv[1]
+    #print("best solution:")
     solve_flp(instance, False)
     #initial_solution_flp("FLP-100-20-0.txt")
     #initial_solution_flp("FLP-200-40-0.txt")
-    print("Local search : ")
     local_search_flp(instance)
     #solve_flp("FLP-100-20-0.txt", False)
