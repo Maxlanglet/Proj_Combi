@@ -125,6 +125,7 @@ def assignment_movement(y,x,c,seed):
 
 #TODO: CHANGE FOR LOOPS
 def solve_flp(instance_name,linear):
+    start = time.time()
     opening_cost, demand, capacity, travel_cost = read_instance(instance_name)
 
     #model creation
@@ -156,12 +157,14 @@ def solve_flp(instance_name,linear):
     opt.solve(model,tee=False)
     #print(pyo.value(model.obj))
 
+    end = time.time()
     x,y,obj,c,d,t,f = convertToNpArray(model)
-    print(obj)
+    #print(obj, ", ", end-start, ", ", instance_name)
     return (obj,x,y,model,c,d,t,f)
 
 def initial_solution_flp(instance_name):
     #GREEDY ALGORITHM
+    start = time.time()
     obj, x, y, model,c,d,t,f = solve_flp(instance_name, True)
 #----------------Algo commence
     sort_y = np.zeros(shape=(y.shape[0], 2))
@@ -188,8 +191,8 @@ def initial_solution_flp(instance_name):
 
         if satisfying_cond(x_bar, d):
             obj = sec_function(x_bar,y_bar,t,f)
-            print(obj)
-
+            end = time.time()
+            #print(obj, ", ", end-start, ", ", instance_name)
             return(obj,x_bar,y_bar,c,d,t,f)
     #return (obj,x,y)
 
@@ -239,7 +242,7 @@ def greedy_reassign(y, x, sort_d, t, c, d):
 
 def local_search_flp(instance_name):
 
-    t_end = 20*60#stopping criterion
+    t_end = 30*60#stopping criterion
     t_1 = time.time()
     obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
 
@@ -247,7 +250,7 @@ def local_search_flp(instance_name):
     sort_d = sort_function(d, "decreasing")
     #Initialization
     y_bar, x_bar = copy.deepcopy(y), copy.deepcopy(x)
-    print("########## BEGIN LOCAL SEARCH ##########")
+    #print("########## BEGIN LOCAL SEARCH ##########")
 
     y_best, x_best = copy.deepcopy(y_bar), copy.deepcopy(x_bar)
     obj_best = copy.deepcopy(obj)
@@ -304,7 +307,7 @@ def local_search_flp(instance_name):
             if respect_constraints(x_new, y_new, c, d):
                 y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
                 obj_best= sec_function(x_best,y_best,t,f)
-                print(obj_best)
+                #print(obj_best)
         else:
             counter_no_improvement+=1
 
@@ -314,9 +317,9 @@ def local_search_flp(instance_name):
             continue_search=False
         seed_original+=1
 
-    print(sec_function(x_best,y_best,t,f))
-    print(obj_best)
-    print(y_best)
+    #print(sec_function(x_best,y_best,t,f))
+    print(obj_best, ", ", t_2-t_1, ", ", instance_name)
+    #print(y_best)
     #print(obj)
     return(obj, x_best,y_best)
     #return (obj,x,y)
@@ -386,8 +389,7 @@ if __name__ == '__main__':
     #instance = "FLP-150-30-0.txt"
     instance = sys.argv[1]
     #print("best solution:")
-    solve_flp(instance, False)
-    #initial_solution_flp("FLP-100-20-0.txt")
-    #initial_solution_flp("FLP-200-40-0.txt")
+    #solve_flp(instance, False)
+    #initial_solution_flp(instance)
     local_search_flp(instance)
     #solve_flp("FLP-100-20-0.txt", False)
