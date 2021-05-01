@@ -13,19 +13,20 @@ for root, dirs, files in os.walk("Instances"):
 paths.sort()
 
 excluded = ['FLP-100-40-1.txt', 'FLP-150-45-1.txt', 'FLP-150-60-0.txt', 'FLP-150-60-1.txt', 'FLP-150-60-2.txt',
-'FLP-200-60-0.txt', 'FLP-200-60-1.txt', 'FLP-200-60-2.txt', 'FLP-200-80-1.txt', 'FLP-200-80-1.txt', 'FLP-200-80-2.txt', 'FLP-250-75-0.txt', 'FLP-250-75-1.txt', 'FLP-250-75-2.txt',
+'FLP-200-60-0.txt', 'FLP-200-60-1.txt', 'FLP-200-60-2.txt', 'FLP-200-80-0.txt', 'FLP-200-80-1.txt', 'FLP-200-80-2.txt', 'FLP-250-75-0.txt', 'FLP-250-75-1.txt', 'FLP-250-75-2.txt',
 'FLP-250-100-2.txt', 'FLP-250-100-1.txt', 'FLP-250-100-0.txt']
 
 results = open("local_search_solutions.txt", "w")
 # results = open("VND_tei_2.txt", "w")
-for filename in paths[:]:
-	if filename in excluded:
-		pass
-	else:
-		start = time.time()
-		print(filename)
-		proc = subprocess.call(["python","flp.py",filename], stdout=results)
-		end = time.time()
+#for filename in paths[21:]:
+for filename in excluded[4:]:
+	# if filename in excluded:
+	# 	pass
+	# else:
+	start = time.time()
+	print(filename)
+	proc = subprocess.call(["python","flp.py",filename], stdout=results)
+	end = time.time()
 	# if filename=='FLP-100-40-1.txt' or filename=='FLP-150-45-1.txt' or filename=='FLP-150-60-0.txt' or filename=='FLP-150-60-1.txt'or filename=='FLP-150-60-2.txt' or filename=='FLP-200-60-0.txt' or filename=='FLP-200-60-1.txt' or filename=='FLP-200-60-2.txt' or filename=='FLP-200-80-0.txt' or filename=='FLP-200-80-1.txt' or filename=='FLP-200-80-2.txt':
 	# 	pass
 	# elif filename=='FLP-250-100-0.txt' or filename=='FLP-250-100-1.txt' or filename=='FLP-250-100-2.txt' or filename=='FLP-250-75-0.txt' or filename=='FLP-250-75-1.txt' or filename=='FLP-250-75-2.txt':

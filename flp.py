@@ -4,6 +4,13 @@ import random
 import time
 import copy
 import sys
+from matplotlib import pyplot as plt
+
+c = np.empty(1)#placeholder to define them as global
+d = np.empty(1)
+t = np.empty(1)
+f = np.empty(1)
+model = pyo.ConcreteModel()
 
 def read_instance(file_name):
     opening_cost = {}
@@ -48,6 +55,10 @@ def sec_function(x,y,t,f):
     return sum(f[j]*y[j] for j in range(len(y)))+sum(t[(i,j)]*x[(i,j)] for i in range(len(x)) for j in range(len(x[0])))
 
 def convertToNpArray(model): #x,y,obj,c,d,t,f,
+    global c
+    global d 
+    global t 
+    global f 
     x = np.zeros(shape=(np.asarray(model.I)[-1]+1,np.asarray(model.J)[-1]+1))
     y = np.zeros(shape=(np.asarray(model.J)[-1]+1))
     for i in np.asarray(model.I):
@@ -57,7 +68,6 @@ def convertToNpArray(model): #x,y,obj,c,d,t,f,
         y[i] = model.y[i].value
 
     obj = pyo.value(model.obj)
-
     c = np.zeros(shape=y.shape)
     d = np.zeros(shape=x.shape[0])
     for k in np.asarray(model.J):
@@ -72,63 +82,16 @@ def convertToNpArray(model): #x,y,obj,c,d,t,f,
     for k in np.asarray(model.I):
         for l in np.asarray(model.J):
             t[k,l]=model.t[k,l]
-    return x,y,obj,c,d,t,f
-
-def facility_movement(y, x,c, seed):
-    y_bar = copy.deepcopy(y)
-    x_bar = copy.deepcopy(x)
-
-    j1_p,j2_p, j1_m, j2_m = random_facility(x_bar, y_bar,c, seed)
-
-    y_bar[j1_p], y_bar[j2_p] = 1, 1
-    y_bar[j1_m], y_bar[j2_m] = 0, 0
-
-    x_bar[:,j1_m] = 0
-    x_bar[:,j2_m] = 0
-
-    return y_bar, x_bar
-
-def assignment_movement(y,x,c,seed):
-    random.seed(seed)
-    y_bar = copy.deepcopy(y)
-    x_bar = copy.deepcopy(x)
-    j = random_assignment(x_bar, seed) #j contains i1 (and may be i2) and 2 facilities associated to him
-
-    if j == []:
-        return y_bar, x_bar
-    # A close look inside the vector j = [[i1,j11,j12], [i2,j21,j22]]
-    #print("---> Look at j: ",j)
-    #TODO : Reassign randomly each demand to up to 2 facilities each.
-    for k in range (j.shape[0]):
-
-        sum_xij_for_2_facilities=0
-        sum_xij_for_2_facilities = x_bar[j[k,0],j[k,1]] + x_bar[j[k,0],j[k,2]]
-        # print("y.shape[0] : ", j.shape[0])
-        # print("x_bar[j[k,0],j[k,1]] : ",x_bar[j[k,0],j[k,1]] )
-        # print("x_bar[j[k,0],j[k,2]]", x_bar[j[k,0],j[k,2]])
-        # print("sum_xij_for_2_facilities :", sum_xij_for_2_facilities)
-        first_new_xij = random.randrange(0, sum_xij_for_2_facilities)
-        second_new_xij= sum_xij_for_2_facilities - first_new_xij
-        x_bar[j[k,0],j[k,1]] = first_new_xij
-        x_bar[j[k,0],j[k,2]] = second_new_xij
-        # print("first_new_xij: ", first_new_xij)
-        # print("second_new_xij : ", second_new_xij)
-        # print("x_bar[j[k,0],j[k,1]] : ", x_bar[j[k,0],j[k,1]])
-        # print("x_bar[j[k,0],j[k,2]] : ", x_bar[j[k,0],j[k,2]])
-        # print("coucou")
-
-
-    #rand_reass =
-    return y_bar, x_bar
+    return x,y,obj#,c,d,t,f
 
 
 
-#TODO: CHANGE FOR LOOPS
 def solve_flp(instance_name,linear):
     start = time.time()
     opening_cost, demand, capacity, travel_cost = read_instance(instance_name)
 
     #model creation
+    global model
     model = pyo.ConcreteModel()
     model.I = pyo.RangeSet(0,len(demand)-1)
     model.J = pyo.RangeSet(0,len(capacity)-1)
@@ -158,14 +121,16 @@ def solve_flp(instance_name,linear):
     #print(pyo.value(model.obj))
 
     end = time.time()
-    x,y,obj,c,d,t,f = convertToNpArray(model)
+    #x,y,obj,c,d,t,f = convertToNpArray(model)
+    x,y,obj = convertToNpArray(model)
     #print(obj, ", ", end-start, ", ", instance_name)
-    return (obj,x,y,model,c,d,t,f)
+    #return (obj,x,y,model,c,d,t,f)
+    return (obj,x,y)
 
 def initial_solution_flp(instance_name):
     #GREEDY ALGORITHM
     start = time.time()
-    obj, x, y, model,c,d,t,f = solve_flp(instance_name, True)
+    obj, x, y = solve_flp(instance_name, True)
 #----------------Algo commence
     sort_y = np.zeros(shape=(y.shape[0], 2))
     for j in range(len(y)):
@@ -193,13 +158,13 @@ def initial_solution_flp(instance_name):
             obj = sec_function(x_bar,y_bar,t,f)
             end = time.time()
             #print(obj, ", ", end-start, ", ", instance_name)
-            return(obj,x_bar,y_bar,c,d,t,f)
+            #return(obj,x_bar,y_bar,c,d,t,f)
+            return(obj,x_bar,y_bar)
     #return (obj,x,y)
 
 def satisfying_cond(x_bar, d):
     j=0
     for i in range(len(d)):
-        #print(d[i], sum(x_bar[i,:]))
         if sum(x_bar[i,:])<d[i]:
             j+=1
     if j!=0:
@@ -240,11 +205,15 @@ def greedy_reassign(y, x, sort_d, t, c, d):
                 x_bar[i,j] = min(c[j]-sum(x_bar[:,j]), d[i]-sum(x_bar[i,:]))
     return y_bar, x_bar
 
-def local_search_flp(instance_name):
+def local_search_flp(x,y):
+
+    plot = []
+    time_plot = []
 
     t_end = 30*60#stopping criterion
     t_1 = time.time()
-    obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
+    #obj,x,y,c,d,t,f = initial_solution_flp(instance_name)
+    #obj,x,y = initial_solution_flp(instance_name)
 
     #Sorting d in decreasing order
     sort_d = sort_function(d, "decreasing")
@@ -253,12 +222,12 @@ def local_search_flp(instance_name):
     #print("########## BEGIN LOCAL SEARCH ##########")
 
     y_best, x_best = copy.deepcopy(y_bar), copy.deepcopy(x_bar)
-    obj_best = copy.deepcopy(obj)
+    obj_best = sec_function(x,y,t,f)
 
     counter_no_improvement=0
     max_no_improvement = 10
     count_local_moves=0
-    max_local_moves_no_improvement = 300
+    max_local_moves_no_improvement = 10000
     #since the seed changes at each iteration of the while
     #it makes sense to suppose a better move even
     #after 3 different local moves without improvement"
@@ -266,8 +235,7 @@ def local_search_flp(instance_name):
     move_facility=False
     move_assignment=True
     continue_search=True
-    # print("move_facility: ", move_facility)
-    # print("move_assignment: ", move_assignment)
+
 
     while(continue_search and count_local_moves<max_local_moves_no_improvement):
         random.seed(seed_original)
@@ -279,8 +247,7 @@ def local_search_flp(instance_name):
             count_local_moves+=1
             move_facility = not move_facility
             move_assignment = not move_assignment
-            # print("move_facility: ", move_facility)
-            # print("move_assignment: ", move_assignment)
+
             if count_local_moves==max_local_moves_no_improvement:
                 print("No more improvement with both movements, the search stops")
 
@@ -305,6 +272,8 @@ def local_search_flp(instance_name):
             count_local_moves=0
             counter_no_improvement=0
             if respect_constraints(x_new, y_new, c, d):
+                plot.append(obj_new)
+                time_plot.append(time.time()-t_1)
                 y_best, x_best = copy.deepcopy(y_new),copy.deepcopy(x_new)
                 obj_best= sec_function(x_best,y_best,t,f)
                 #print(obj_best)
@@ -317,12 +286,48 @@ def local_search_flp(instance_name):
             continue_search=False
         seed_original+=1
 
-    #print(sec_function(x_best,y_best,t,f))
-    print(obj_best, ", ", t_2-t_1, ", ", instance_name)
-    #print(y_best)
-    #print(obj)
-    return(obj, x_best,y_best)
-    #return (obj,x,y)
+    #print(obj_best, ", ", t_2-t_1, ", ", instance_name)
+
+    # plt.ylabel('Obj_fct')
+    # plt.xlabel('Time (s)')
+    # plt.plot(time_plot, plot)
+    # plt.grid(True)
+    # plt.savefig('obj_fct_time.png')
+    return(obj_best, x_best,y_best)
+
+def facility_movement(y, x,c, seed):
+    y_bar = copy.deepcopy(y)
+    x_bar = copy.deepcopy(x)
+
+    j1_p,j2_p, j1_m, j2_m = random_facility(x_bar, y_bar,c, seed)
+
+    y_bar[j1_p], y_bar[j2_p] = 1, 1
+    y_bar[j1_m], y_bar[j2_m] = 0, 0
+
+    x_bar[:,j1_m] = 0
+    x_bar[:,j2_m] = 0
+
+    return y_bar, x_bar
+
+def assignment_movement(y,x,c,seed):
+    random.seed(seed)
+    y_bar = copy.deepcopy(y)
+    x_bar = copy.deepcopy(x)
+    j = random_assignment(x_bar, seed) #j contains i1 (and may be i2) and 2 facilities associated to him
+
+    if j == []:
+        return y_bar, x_bar
+    # A close look inside the vector j = [[i1,j11,j12], [i2,j21,j22]]
+    for k in range (j.shape[0]):
+
+        sum_xij_for_2_facilities=0
+        sum_xij_for_2_facilities = x_bar[j[k,0],j[k,1]] + x_bar[j[k,0],j[k,2]]
+
+        first_new_xij = random.randrange(0, sum_xij_for_2_facilities)
+        second_new_xij= sum_xij_for_2_facilities - first_new_xij
+        x_bar[j[k,0],j[k,1]] = first_new_xij
+        x_bar[j[k,0],j[k,2]] = second_new_xij
+    return y_bar, x_bar
 
 def respect_constraints(x,y,c,d):
     const1 = [sum(x[i,:])>=d[i] for i in range(x.shape[0])]
